@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>an8nymous Stats — System Overlay for Windows</title>
+<meta name="description" content="Lightweight always-on-top system stats overlay for Windows. CPU, GPU, RAM, Disk I/O and Network — built with Rust and Tauri.">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg:        #0c0c0b;
+  --bg-card:   #131312;
+  --bg-hover:  #1c1b19;
+  --text:      #EDEBE6;
+  --text-dim:  #A9A39B;
+  --text-muted:#615C56;
+  --accent:    #C8C1B8;
+  --border:    rgba(237,235,230,0.07);
+  --border-hi: rgba(237,235,230,0.13);
+  --mono:      'Consolas', 'Courier New', monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Segoe UI', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ── */
+.container { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+
+/* ── Header ── */
+header {
+  border-bottom: 1px solid var(--border);
+  padding: 22px 0;
+}
+header .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.logo { font-size: 14px; font-weight: 600; letter-spacing: 1px; color: var(--accent); }
+.logo span { color: var(--text-muted); font-weight: 400; }
+.gh-link {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+.gh-link:hover { color: var(--accent); border-color: var(--border-hi); background: var(--bg-card); }
+.gh-link svg { width: 15px; height: 15px; fill: currentColor; }
+
+/* ── Hero ── */
+.hero { padding: 80px 0 60px; text-align: center; }
+.hero h1 {
+  font-size: clamp(32px, 6vw, 48px);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text);
+  line-height: 1.1;
+  margin-bottom: 16px;
+}
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero p {
+  font-size: 15px;
+  color: var(--text-dim);
+  max-width: 480px;
+  margin: 0 auto 40px;
+  line-height: 1.65;
+}
+
+/* ── Overlay preview ── */
+.overlay-preview {
+  display: inline-block;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(237,235,230,0.12);
+  border-radius: 4px;
+  padding: 7px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: #cfbaba;
+  letter-spacing: 0.3px;
+  margin-bottom: 44px;
+  text-shadow: 0 0 3px rgba(0,0,0,0.8), 1px 1px 2px rgba(0,0,0,0.6);
+  white-space: nowrap;
+}
+
+/* ── Download button ── */
+.download-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.btn-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 13px 28px;
+  border-radius: 8px;
+  text-decoration: none;
+  letter-spacing: 0.3px;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+.btn-download:hover {
+  background: var(--text);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(200,193,184,0.18);
+}
+.btn-download svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
+.dl-meta { font-size: 11px; color: var(--text-muted); }
+.version-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* ── Divider ── */
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 64px 0;
+}
+
+/* ── Features ── */
+.section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 28px;
+}
+.features { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 0; }
+@media (max-width: 520px) { .features { grid-template-columns: 1fr; } }
+.feature {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 20px;
+  transition: border-color 0.2s;
+}
+.feature:hover { border-color: var(--border-hi); }
+.feature-name {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--accent);
+  margin-bottom: 5px;
+  letter-spacing: 0.3px;
+}
+.feature-desc { font-size: 12px; color: var(--text-muted); line-height: 1.55; }
+
+/* ── How it works ── */
+.steps { display: flex; flex-direction: column; gap: 0; }
+.step {
+  display: flex;
+  gap: 20px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+}
+.step:last-child { border-bottom: none; }
+.step-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.step-body h4 { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+.step-body p { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+.step-body code {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--accent);
+}
+
+/* ── Requirements ── */
+.req-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.req-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.req-list li::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+.req-list a { color: var(--accent); text-decoration: none; }
+.req-list a:hover { text-decoration: underline; }
+
+/* ── Footer ── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 28px 0;
+  margin-top: 80px;
+}
+footer .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.footer-text { font-size: 11px; color: var(--text-muted); }
+.footer-links { display: flex; gap: 20px; }
+.footer-links a { font-size: 11px; color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+.footer-links a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <span class="logo">an8nymous<span> Stats</span></span>
+    <a class="gh-link" href="https://github.com/Lucagdev/rust-stats-overlay" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="container">
+      <h1>System stats,<br><em>always on top.</em></h1>
+      <p>Lightweight overlay for Windows that shows CPU, GPU, RAM, Disk I/O and Network metrics in a transparent bar that stays above any app — including games.</p>
+
+      <div class="overlay-preview" id="preview">
+        CPU 14%&nbsp;&nbsp;2.40GHz&nbsp;&nbsp;GPU 68%&nbsp;&nbsp;RAM 58%&nbsp;&nbsp;11.2/32.0GB&nbsp;&nbsp;Disk 0MB/s&nbsp;&nbsp;↓0.1↑0.0MB/s
+      </div>
+
+      <div class="download-wrap">
+        <a class="btn-download" id="dl-btn" href="https://github.com/Lucagdev/rust-stats-overlay/releases/latest/download/an8nymous-stats.exe">
+          <svg viewBox="0 0 16 16"><path d="M7.47 10.78a.75.75 0 001.06 0l3.75-3.75a.75.75 0 00-1.06-1.06L8.75 8.44V1.75a.75.75 0 00-1.5 0v6.69L4.78 5.97a.75.75 0 00-1.06 1.06l3.75 3.75zM1.75 13a.75.75 0 000 1.5h12.5a.75.75 0 000-1.5H1.75z"/></svg>
+          Download for Windows
+          <span class="version-badge" id="version">...</span>
+        </a>
+        <span class="dl-meta">an8nymous-stats.exe · no installer needed</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="container">
+    <hr class="divider">
+
+    <section style="margin-bottom: 64px;">
+      <p class="section-label">Metrics</p>
+      <div class="features">
+        <div class="feature">
+          <div class="feature-name">CPU % · Freq GHz</div>
+          <div class="feature-desc">Usage percentage and average clock speed across all cores.</div>
+        </div>
+        <div class="feature">
+          <div class="feature-name">GPU % · Temp · Clock</div>
+          <div class="feature-desc">NVIDIA GPU usage, temperature and core frequency via NVML.</div>
+        </div>
+        <div class="feature">
+          <div class="feature-name">GPU Power · VRAM</div>
+          <div class="feature-desc">Power draw in watts and video memory usage in MB.</div>
+        </div>
+        <div class="feature">
+          <div class="feature-name">RAM % · GB</div>
+          <div class="feature-desc">Memory usage as a percentage and absolute value.</div>
+        </div>
+        <div class="feature">
+          <div class="feature-name">Disk I/O MB/s</div>
+          <div class="feature-desc">Real-time read/write throughput via Windows PDH counters.</div>
+        </div>
+        <div class="feature">
+          <div class="feature-name">Network ↓↑ MB/s</div>
+          <div class="feature-desc">Download and upload speed across all network interfaces.</div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider" style="margin-top: 0;">
+
+    <section style="margin-bottom: 64px;">
+      <p class="section-label">How to use</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <h4>Download and run</h4>
+            <p>Download <code>an8nymous-stats.exe</code> and run it — no installation required. The overlay appears in the top-right corner of your screen.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <h4>Open Settings from the tray</h4>
+            <p>Right-click the tray icon to open Settings. Choose which metrics to show, reorder them, change colors, font and position.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <h4>Works above games</h4>
+            <p>The overlay re-asserts <code>HWND_TOPMOST</code> every 500ms, staying visible even when a game window tries to take over. Run your game in <strong>Borderless Windowed</strong> mode for best results.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <h4>Start with Windows (optional)</h4>
+            <p>Enable the startup option in Preferences to launch automatically at login.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider" style="margin-top: 0;">
+
+    <section style="margin-bottom: 0;">
+      <p class="section-label">Requirements</p>
+      <ul class="req-list">
+        <li>Windows 10 or Windows 11 (64-bit)</li>
+        <li><a href="https://developer.microsoft.com/en-us/microsoft-edge/webview2/" target="_blank" rel="noopener">Microsoft WebView2 Runtime</a> — pre-installed on Windows 11, auto-installs on Windows 10</li>
+        <li>NVIDIA GPU for GPU metrics — the app runs normally without one, GPU fields are simply hidden</li>
+        <li>No admin rights required</li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <span class="footer-text">an8nymous Stats · open source</span>
+    <div class="footer-links">
+      <a href="https://github.com/Lucagdev/rust-stats-overlay" target="_blank" rel="noopener">Source code</a>
+      <a href="https://github.com/Lucagdev/rust-stats-overlay/releases" target="_blank" rel="noopener">All releases</a>
+      <a href="https://github.com/Lucagdev/rust-stats-overlay/issues" target="_blank" rel="noopener">Report issue</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Fetch latest release info from GitHub API
+fetch('https://api.github.com/repos/Lucagdev/rust-stats-overlay/releases/latest')
+  .then(r => r.json())
+  .then(data => {
+    if (!data.tag_name) return;
+    document.getElementById('version').textContent = data.tag_name;
+    const asset = data.assets && data.assets.find(a => a.name === 'an8nymous-stats.exe');
+    if (asset) {
+      document.getElementById('dl-btn').href = asset.browser_download_url;
+    }
+  })
+  .catch(() => {
+    document.getElementById('version').textContent = 'latest';
+  });
+</script>
+
+</body>
+</html>

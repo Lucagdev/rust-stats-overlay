@@ -1,0 +1,50 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build release binary
+        run: cargo build --release
+        working-directory: src-tauri
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: an8nymous Stats ${{ github.ref_name }}
+          body: |
+            ## an8nymous Stats ${{ github.ref_name }}
+
+            Lightweight system stats overlay for Windows — always-on-top, transparent, click-through.
+
+            ### Download
+            Click **an8nymous-stats.exe** below. No installer needed — just run it.
+
+            ### Requirements
+            - Windows 10 or 11
+            - [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (pre-installed on Windows 11)
+            - NVIDIA GPU for GPU metrics (optional — app works without it)
+
+            ### First run
+            The overlay appears in the top-right corner. Right-click the tray icon to open Settings or toggle visibility.
+          files: src-tauri/target/release/an8nymous-stats.exe
+          fail_on_unmatched_files: true
