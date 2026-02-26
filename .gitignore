@@ -1,0 +1,15 @@
+# Rust build artifacts
+src-tauri/target/
+src-tauri/gen/
+
+# User config (generated at runtime)
+config.json
+
+# Claude Code
+.claude/
+.mcp.json
+
+# OS
+.DS_Store
+Thumbs.db
+nul

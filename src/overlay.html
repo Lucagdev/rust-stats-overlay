@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    background: transparent;
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+    user-select: none;
+    -webkit-user-select: none;
+}
+body {
+    display: flex;
+    align-items: center;
+    padding: 0 5px;
+    background: transparent !important;
+}
+#stats {
+    font-family: Arial, sans-serif;
+    font-size: 9pt;
+    color: #CCCCCC;
+    white-space: nowrap;
+    text-shadow: 0 0 3px rgba(0,0,0,0.8), 1px 1px 2px rgba(0,0,0,0.6);
+    letter-spacing: 0.3px;
+}
+</style>
+</head>
+<body>
+<div id="stats">Loading...</div>
+
+<script>
+const invoke = window.__TAURI__.core.invoke;
+const statsEl = document.getElementById('stats');
+
+let config = null;
+let lastConfigStr = '';
+
+const FMT = {
+    cpu:       (s) => `CPU ${s.cpu_percent.toFixed(0)}%`,
+    cpu_freq:  (s) => s.cpu_freq_ghz > 0 ? `${s.cpu_freq_ghz.toFixed(2)}GHz` : null,
+    ram:       (s) => `RAM ${s.ram_percent.toFixed(0)}%`,
+    ram_gb:    (s) => `${s.ram_used_gb.toFixed(1)}/${s.ram_total_gb.toFixed(1)}GB`,
+    gpu:       (s) => s.gpu_percent != null ? `GPU ${s.gpu_percent}%` : 'GPU N/A',
+    gpu_temp:  (s) => s.gpu_temp != null ? `${s.gpu_temp}°C` : null,
+    gpu_power: (s) => s.gpu_power_w != null ? `${s.gpu_power_w}W` : null,
+    gpu_clock: (s) => s.gpu_clock_mhz != null ? `${s.gpu_clock_mhz}MHz` : null,
+    vram:      (s) => s.vram_used_mb != null ? `VRAM ${s.vram_used_mb}MB` : null,
+    disk_io:   (s) => `Disk ${Math.max(s.disk_read_mb, s.disk_write_mb).toFixed(0)}MB/s`,
+    net_io:    (s) => `↓${s.net_down_mb.toFixed(1)}↑${s.net_up_mb.toFixed(1)}MB/s`,
+};
+
+function applyConfig(cfg) {
+    config = cfg;
+    statsEl.style.color = cfg.appearance.text_color || '#CCCCCC';
+    statsEl.style.fontFamily = cfg.appearance.font_family || 'Arial';
+    statsEl.style.fontSize = (cfg.appearance.font_size || 9) + 'pt';
+}
+
+function renderStats(stats) {
+    if (!config) return;
+    const order = config.metrics_order || Object.keys(FMT);
+    const parts = [];
+    for (const key of order) {
+        if (!config.metrics[key]) continue;
+        const fn = FMT[key];
+        if (!fn) continue;
+        const v = fn(stats);
+        if (v != null) parts.push(v);
+    }
+    statsEl.textContent = parts.length > 0 ? parts.join('   ') : 'No metrics selected';
+}
+
+// Config polling: 100ms, compares JSON to detect changes (~0.01ms per call, Mutex read)
+async function pollConfig() {
+    try {
+        const cfg = await invoke('get_config');
+        const str = JSON.stringify(cfg);
+        if (str !== lastConfigStr) {
+            lastConfigStr = str;
+            applyConfig(cfg);
+        }
+    } catch (e) {}
+}
+
+// Stats polling: 1s interval
+async function pollStats() {
+    try {
+        const stats = await invoke('get_stats');
+        renderStats(stats);
+    } catch (e) {}
+}
+
+// Init
+(async () => {
+    await pollConfig();
+    await pollStats();
+    setInterval(pollConfig, 100);
+    setInterval(pollStats, 1000);
+})();
+</script>
+</body>
+</html>

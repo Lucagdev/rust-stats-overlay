@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>an8nymous Stats - Settings</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --bg: #111110;
+    --bg-secondary: #1C1B19;
+    --bg-tertiary: #282623;
+    --text-primary: #EDEBE6;
+    --text-secondary: #A9A39B;
+    --text-muted: #615C56;
+    --accent: #EDEBE6;
+    --accent-warm: #C8C1B8;
+    --border: rgba(237, 235, 230, 0.08);
+    --border-hover: rgba(237, 235, 230, 0.14);
+    --glass-bg: rgba(237, 235, 230, 0.03);
+    --glass-border: rgba(237, 235, 230, 0.06);
+    --scrollbar: rgba(237, 235, 230, 0.12);
+    --radius: 10px;
+    --radius-sm: 7px;
+}
+
+body {
+    font-family: 'Segoe UI', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 28px 28px 22px;
+}
+
+header { flex-shrink: 0; margin-bottom: 22px; }
+header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.8px; color: var(--accent); }
+header .subtitle { font-size: 10px; font-weight: 500; color: var(--text-muted); margin-top: 3px; letter-spacing: 2px; text-transform: uppercase; }
+
+.tabs { flex-shrink: 0; display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 22px; }
+.tab-btn { background: none; border: none; color: var(--text-muted); font-size: 13px; font-weight: 500; padding: 8px 18px 12px; cursor: pointer; position: relative; transition: color 0.25s ease; font-family: inherit; }
+.tab-btn:hover { color: var(--text-secondary); }
+.tab-btn.active { color: var(--accent); }
+.tab-btn.active::after { content: ''; position: absolute; bottom: -1px; left: 8px; right: 8px; height: 1.5px; background: var(--accent-warm); border-radius: 2px 2px 0 0; opacity: 0.6; }
+
+main { flex: 1; overflow-y: auto; overflow-x: hidden; padding-right: 6px; }
+main::-webkit-scrollbar { width: 4px; }
+main::-webkit-scrollbar-track { background: transparent; }
+main::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
+
+.tab-panel { display: none; animation: fadeIn 0.25s ease; }
+.tab-panel.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+.section-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; letter-spacing: 0.2px; }
+
+.glass { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius); transition: border-color 0.2s ease, background 0.2s ease; }
+.glass:hover { border-color: var(--border-hover); background: rgba(237, 235, 230, 0.04); }
+
+.metric-item { display: flex; align-items: center; padding: 11px 14px; margin-bottom: 6px; }
+.metric-label { flex: 1; font-size: 12.5px; margin-left: 14px; color: var(--text-secondary); transition: color 0.15s; }
+.metric-item:hover .metric-label { color: var(--text-primary); }
+.metric-arrows { display: flex; gap: 4px; }
+.arrow-btn { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-muted); font-size: 12px; cursor: pointer; transition: all 0.2s ease; font-family: inherit; }
+.arrow-btn:hover { background: var(--bg-tertiary); color: var(--accent); border-color: var(--border-hover); }
+
+.toggle { position: relative; width: 38px; height: 20px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle-track { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 20px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.toggle-track::before { content: ''; position: absolute; height: 14px; width: 14px; left: 2px; bottom: 2px; background: var(--text-muted); border-radius: 50%; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.toggle input:checked + .toggle-track { background: var(--accent-warm); border-color: var(--accent-warm); }
+.toggle input:checked + .toggle-track::before { transform: translateX(18px); background: var(--bg); }
+
+.setting-group { margin-bottom: 14px; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px; }
+.setting-label { font-size: 13px; color: var(--text-secondary); }
+.setting-hint { font-size: 11px; color: var(--text-muted); margin-top: 6px; padding-left: 4px; line-height: 1.5; }
+
+.color-picker-wrap { display: flex; align-items: center; gap: 10px; }
+.color-preview { width: 26px; height: 26px; border-radius: var(--radius-sm); border: 1px solid var(--border-hover); cursor: pointer; transition: all 0.2s; }
+.color-preview:hover { border-color: var(--accent-warm); transform: scale(1.08); }
+input[type="color"] { opacity: 0; width: 0; height: 0; position: absolute; }
+.color-hex { font-size: 11.5px; font-family: 'Consolas', 'Courier New', monospace; color: var(--text-muted); }
+
+.slider-group { padding: 14px 16px; }
+.slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.slider-title { font-size: 13px; color: var(--text-secondary); }
+.slider-value { font-size: 11.5px; font-family: 'Consolas', 'Courier New', monospace; color: var(--text-muted); min-width: 48px; text-align: right; }
+input[type="range"] { -webkit-appearance: none; width: 100%; height: 3px; background: var(--bg-tertiary); border-radius: 2px; outline: none; cursor: pointer; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: var(--accent-warm); border-radius: 50%; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); background: var(--accent); }
+input[type="range"]:disabled { opacity: 0.25; cursor: not-allowed; }
+input[type="range"]:disabled::-webkit-slider-thumb { cursor: not-allowed; transform: none; }
+
+.select-wrap select { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 13px; font-family: inherit; padding: 9px 12px; cursor: pointer; outline: none; transition: border-color 0.2s; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23615C56' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+.select-wrap select:hover { border-color: var(--border-hover); }
+.select-wrap select:focus { border-color: var(--accent-warm); }
+.select-wrap select option { background: var(--bg-secondary); color: var(--text-primary); }
+
+.stepper { display: flex; align-items: center; }
+.stepper-btn { width: 32px; height: 30px; display: flex; align-items: center; justify-content: center; background: var(--bg); border: 1px solid var(--border); color: var(--text-muted); font-size: 15px; cursor: pointer; transition: all 0.2s ease; font-family: inherit; }
+.stepper-btn:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.stepper-btn:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.stepper-btn:hover { background: var(--bg-tertiary); color: var(--accent); border-color: var(--border-hover); }
+.stepper-display { height: 30px; min-width: 58px; display: flex; align-items: center; justify-content: center; background: var(--bg-secondary); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: 12px; font-family: 'Consolas', 'Courier New', monospace; color: var(--text-secondary); }
+
+.pref-card { padding: 18px; }
+.pref-item { display: flex; align-items: flex-start; gap: 16px; }
+.pref-text h3 { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 5px; }
+.pref-text p { font-size: 11px; color: var(--text-muted); line-height: 1.6; }
+
+footer { flex-shrink: 0; display: flex; justify-content: flex-end; gap: 10px; padding-top: 18px; border-top: 1px solid var(--border); margin-top: 14px; }
+.btn { padding: 8px 22px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.25s ease; border: 1px solid transparent; font-family: inherit; letter-spacing: 0.3px; }
+.btn-ghost { background: transparent; color: var(--text-muted); }
+.btn-ghost:hover { color: var(--text-secondary); background: var(--glass-bg); }
+.btn-primary { background: var(--accent-warm); color: var(--bg); border-color: var(--accent-warm); }
+.btn-primary:hover { background: var(--accent); filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(200, 193, 184, 0.15); }
+
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px); background: var(--bg-tertiary); border: 1px solid var(--border-hover); border-radius: var(--radius); padding: 10px 22px; font-size: 12px; color: var(--text-secondary); opacity: 0; transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); pointer-events: none; z-index: 100; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.disabled { opacity: 0.25; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div class="app">
+    <header>
+        <h1>an8nymous Stats</h1>
+        <p class="subtitle">Settings</p>
+    </header>
+
+    <nav class="tabs">
+        <button class="tab-btn active" data-tab="metrics">Metrics</button>
+        <button class="tab-btn" data-tab="appearance">Appearance</button>
+        <button class="tab-btn" data-tab="preferences">Preferences</button>
+    </nav>
+
+    <main>
+        <div class="tab-panel active" id="tab-metrics">
+            <p class="section-desc">Select and reorder the metrics displayed in the overlay</p>
+            <div id="metrics-list"></div>
+        </div>
+
+        <div class="tab-panel" id="tab-appearance">
+            <div class="setting-group">
+                <div class="glass setting-row">
+                    <span class="setting-label">Transparent background</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="transparent-bg">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <p class="setting-hint">Disables the opacity control. Requires restarting the overlay.</p>
+            </div>
+            <div class="setting-group">
+                <div class="glass setting-row">
+                    <span class="setting-label">Text color</span>
+                    <div class="color-picker-wrap">
+                        <span class="color-hex" id="color-hex">#CCCCCC</span>
+                        <div class="color-preview" id="color-preview" title="Click to change"></div>
+                        <input type="color" id="text-color" value="#CCCCCC">
+                    </div>
+                </div>
+            </div>
+            <div class="setting-group">
+                <div class="glass slider-group">
+                    <div class="slider-header">
+                        <span class="slider-title">Horizontal position (X)</span>
+                        <span class="slider-value" id="pos-x-val">0</span>
+                    </div>
+                    <input type="range" id="pos-x" min="0" max="1920" value="0">
+                </div>
+            </div>
+            <div class="setting-group">
+                <div class="glass slider-group">
+                    <div class="slider-header">
+                        <span class="slider-title">Vertical position (Y)</span>
+                        <span class="slider-value" id="pos-y-val">15</span>
+                    </div>
+                    <input type="range" id="pos-y" min="0" max="500" value="15">
+                </div>
+            </div>
+            <div class="setting-group" id="opacity-group">
+                <div class="glass slider-group">
+                    <div class="slider-header">
+                        <span class="slider-title">Opacity</span>
+                        <span class="slider-value" id="opacity-val">100%</span>
+                    </div>
+                    <input type="range" id="opacity" min="10" max="100" value="100">
+                </div>
+            </div>
+            <div class="setting-group">
+                <div class="glass slider-group">
+                    <div class="slider-header">
+                        <span class="slider-title">Font</span>
+                    </div>
+                    <div class="select-wrap">
+                        <select id="font-family">
+                            <option value="Arial">Arial</option>
+                            <option value="Consolas">Consolas</option>
+                            <option value="Courier New">Courier New</option>
+                            <option value="Segoe UI">Segoe UI</option>
+                            <option value="Tahoma">Tahoma</option>
+                            <option value="Verdana">Verdana</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="setting-group">
+                <div class="glass setting-row">
+                    <span class="setting-label">Font size</span>
+                    <div class="stepper">
+                        <button class="stepper-btn" id="fontsize-dec">&minus;</button>
+                        <span class="stepper-display" id="fontsize-val">9 pt</span>
+                        <button class="stepper-btn" id="fontsize-inc">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-panel" id="tab-preferences">
+            <p class="section-desc">General application settings</p>
+            <div class="glass pref-card">
+                <div class="pref-item">
+                    <label class="toggle" style="margin-top: 2px;">
+                        <input type="checkbox" id="startup-toggle">
+                        <span class="toggle-track"></span>
+                    </label>
+                    <div class="pref-text">
+                        <h3>Start with Windows</h3>
+                        <p>an8nymous Stats will launch automatically when you log in to Windows.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <button class="btn btn-ghost" id="btn-reset">Reset defaults</button>
+        <button class="btn btn-primary" id="btn-close">Close</button>
+    </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const { invoke } = window.__TAURI__.core;
+const { getCurrentWindow } = window.__TAURI__.window;
+
+let config = {};
+let metricsOrder = [];
+let screenWidth = 1920;
+let screenHeight = 1080;
+
+const METRICS_LABELS = {
+    cpu:       'CPU % (Processor Usage)',
+    cpu_freq:  'CPU Freq (Processor Clock in GHz)',
+    ram:       'RAM % (Memory Percentage)',
+    ram_gb:    'RAM GB (Memory in Gigabytes)',
+    gpu:       'GPU % (GPU Usage)',
+    gpu_temp:  'GPU Temp (GPU Temperature)',
+    gpu_power: 'GPU Power (Power Draw in Watts)',
+    gpu_clock: 'GPU Clock (GPU Frequency in MHz)',
+    vram:      'VRAM (Video Memory)',
+    disk_io:   'Disk I/O (Read/Write MB/s)',
+    net_io:    'Net I/O (↓Download ↑Upload MB/s)',
+};
+
+function debounce(fn, ms) {
+    let timer;
+    return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
+
+let toastTimer;
+function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const [cfg, screenSize, startup] = await Promise.all([
+            invoke('get_config'),
+            invoke('get_screen_size'),
+            invoke('get_startup_status')
+        ]);
+        config = cfg;
+        screenWidth = screenSize[0];
+        screenHeight = screenSize[1];
+        metricsOrder = config.metrics_order || Object.keys(METRICS_LABELS);
+        initTabs();
+        renderMetrics();
+        initAppearance();
+        initPreferences(startup);
+        initFooter();
+    } catch (e) {
+        console.error('Init error:', e);
+    }
+});
+
+function initTabs() {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        });
+    });
+}
+
+function renderMetrics() {
+    const list = document.getElementById('metrics-list');
+    list.innerHTML = '';
+    metricsOrder.forEach((key) => {
+        const enabled = config.metrics[key] !== false;
+        const item = document.createElement('div');
+        item.className = 'glass metric-item';
+        item.dataset.key = key;
+        item.innerHTML = `
+            <label class="toggle">
+                <input type="checkbox" ${enabled ? 'checked' : ''}>
+                <span class="toggle-track"></span>
+            </label>
+            <span class="metric-label">${METRICS_LABELS[key] || key}</span>
+            <div class="metric-arrows">
+                <button class="arrow-btn" data-dir="up" title="Move up">&#8593;</button>
+                <button class="arrow-btn" data-dir="down" title="Move down">&#8595;</button>
+            </div>
+        `;
+        item.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
+            config.metrics[key] = e.target.checked;
+            invoke('save_metric', { key, enabled: e.target.checked });
+        });
+        item.querySelectorAll('.arrow-btn').forEach(btn => {
+            btn.addEventListener('click', () => moveMetric(key, btn.dataset.dir));
+        });
+        list.appendChild(item);
+    });
+}
+
+function moveMetric(key, dir) {
+    const idx = metricsOrder.indexOf(key);
+    if (dir === 'up' && idx > 0) {
+        [metricsOrder[idx], metricsOrder[idx - 1]] = [metricsOrder[idx - 1], metricsOrder[idx]];
+    } else if (dir === 'down' && idx < metricsOrder.length - 1) {
+        [metricsOrder[idx], metricsOrder[idx + 1]] = [metricsOrder[idx + 1], metricsOrder[idx]];
+    } else return;
+    config.metrics_order = metricsOrder;
+    renderMetrics();
+    invoke('save_metrics_order', { order: metricsOrder });
+}
+
+function initAppearance() {
+    const app = config.appearance || {};
+
+    const transparentEl = document.getElementById('transparent-bg');
+    transparentEl.checked = app.transparent_bg !== false;
+    transparentEl.addEventListener('change', (e) => {
+        invoke('save_appearance', { key: 'transparent_bg', value: e.target.checked });
+        updateOpacityState(e.target.checked);
+        showToast('Restart the overlay to apply transparency changes');
+    });
+
+    const colorInput = document.getElementById('text-color');
+    const colorPreview = document.getElementById('color-preview');
+    const colorHex = document.getElementById('color-hex');
+    const currentColor = app.text_color || '#CCCCCC';
+    colorInput.value = currentColor;
+    colorPreview.style.backgroundColor = currentColor;
+    colorHex.textContent = currentColor.toUpperCase();
+    colorPreview.addEventListener('click', () => colorInput.click());
+    colorInput.addEventListener('input', (e) => {
+        colorPreview.style.backgroundColor = e.target.value;
+        colorHex.textContent = e.target.value.toUpperCase();
+        saveAppDebounced('text_color', e.target.value);
+    });
+
+    const posX = document.getElementById('pos-x');
+    const posXVal = document.getElementById('pos-x-val');
+    posX.max = screenWidth - 100;
+    const currentX = app.position_x != null ? app.position_x : (screenWidth - 665);
+    posX.value = currentX;
+    posXVal.textContent = currentX + 'px';
+    posX.addEventListener('input', (e) => {
+        posXVal.textContent = e.target.value + 'px';
+        saveAppDebounced('position_x', parseInt(e.target.value));
+    });
+
+    const posY = document.getElementById('pos-y');
+    const posYVal = document.getElementById('pos-y-val');
+    const currentY = app.position_y != null ? app.position_y : 15;
+    posY.value = currentY;
+    posYVal.textContent = currentY + 'px';
+    posY.addEventListener('input', (e) => {
+        posYVal.textContent = e.target.value + 'px';
+        saveAppDebounced('position_y', parseInt(e.target.value));
+    });
+
+    const opacity = document.getElementById('opacity');
+    const opacityVal = document.getElementById('opacity-val');
+    const currentOpacity = Math.round((app.opacity != null ? app.opacity : 1.0) * 100);
+    opacity.value = currentOpacity;
+    opacityVal.textContent = currentOpacity + '%';
+    updateOpacityState(transparentEl.checked);
+    opacity.addEventListener('input', (e) => {
+        opacityVal.textContent = e.target.value + '%';
+        saveAppDebounced('opacity', parseInt(e.target.value) / 100);
+    });
+
+    const fontSelect = document.getElementById('font-family');
+    fontSelect.value = app.font_family || 'Arial';
+    fontSelect.addEventListener('change', (e) => {
+        invoke('save_appearance', { key: 'font_family', value: e.target.value });
+    });
+
+    let fontSize = app.font_size || 9;
+    const fontVal = document.getElementById('fontsize-val');
+    fontVal.textContent = fontSize + ' pt';
+    document.getElementById('fontsize-dec').addEventListener('click', () => {
+        fontSize = Math.max(6, fontSize - 1);
+        fontVal.textContent = fontSize + ' pt';
+        invoke('save_appearance', { key: 'font_size', value: fontSize });
+    });
+    document.getElementById('fontsize-inc').addEventListener('click', () => {
+        fontSize = Math.min(20, fontSize + 1);
+        fontVal.textContent = fontSize + ' pt';
+        invoke('save_appearance', { key: 'font_size', value: fontSize });
+    });
+}
+
+const saveAppDebounced = debounce((key, value) => {
+    invoke('save_appearance', { key, value });
+}, 16);
+
+function updateOpacityState(transparent) {
+    document.getElementById('opacity-group').classList.toggle('disabled', transparent);
+}
+
+function initPreferences(startupStatus) {
+    const toggle = document.getElementById('startup-toggle');
+    toggle.checked = startupStatus;
+    toggle.addEventListener('change', async (e) => {
+        try {
+            const success = await invoke('toggle_startup', { enabled: e.target.checked });
+            if (!success) {
+                e.target.checked = !e.target.checked;
+                showToast('Failed to update startup setting');
+            }
+        } catch (err) {
+            e.target.checked = !e.target.checked;
+            showToast('Failed to update startup setting');
+        }
+    });
+}
+
+function initFooter() {
+    document.getElementById('btn-reset').addEventListener('click', async () => {
+        const newConfig = await invoke('reset_settings');
+        config = newConfig;
+        metricsOrder = config.metrics_order || Object.keys(METRICS_LABELS);
+        renderMetrics();
+        initAppearance();
+        showToast('Settings restored to defaults');
+    });
+    document.getElementById('btn-close').addEventListener('click', () => {
+        getCurrentWindow().close();
+    });
+}
+</script>
+</body>
+</html>
