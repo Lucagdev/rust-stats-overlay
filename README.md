@@ -8,7 +8,9 @@ Lightweight always-on-top system stats overlay for Windows, built with Rust and 
 
 ---
 
-![Overlay preview](docs/preview.png)
+```
+CPU 14%  2.40GHz  GPU 68%  1800MHz  RAM 58%  11.2/32.0GB  Disk 0MB/s  ↓0.1↑0.0MB/s
+```
 
 > A transparent bar that sits on top of any window — including games running in Borderless Windowed mode.
 
