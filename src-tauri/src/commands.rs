@@ -1,4 +1,6 @@
 use crate::config::{self, AppConfig, ConfigState};
+#[cfg(target_os = "linux")]
+use crate::conky;
 use crate::stats::{StatsState, SystemStats};
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -35,6 +37,8 @@ pub fn save_metric(app: AppHandle, state: State<'_, ConfigState>, key: String, e
         _ => return Err(format!("Unknown metric: {}", key)),
     }
     config::save_config(&cfg)?;
+    #[cfg(target_os = "linux")]
+    conky::apply(&cfg);
     notify_overlay(&app);
     Ok(true)
 }
@@ -44,6 +48,8 @@ pub fn save_metrics_order(app: AppHandle, state: State<'_, ConfigState>, order: 
     let mut cfg = state.0.lock().unwrap();
     cfg.metrics_order = order;
     config::save_config(&cfg)?;
+    #[cfg(target_os = "linux")]
+    conky::apply(&cfg);
     notify_overlay(&app);
     Ok(true)
 }
@@ -82,7 +88,12 @@ pub fn save_appearance(
     }
     config::save_config(&cfg)?;
 
-    // Posição: mover janela diretamente via Rust (instantâneo)
+    // Linux: regenerate conky config and restart
+    #[cfg(target_os = "linux")]
+    conky::apply(&cfg);
+
+    // Windows: move overlay window directly (instantaneous)
+    #[cfg(target_os = "windows")]
     if let Some(overlay) = app.get_webview_window("overlay") {
         if key == "position_x" || key == "position_y" {
             let x = cfg.appearance.position_x.unwrap_or_else(|| {
@@ -99,7 +110,6 @@ pub fn save_appearance(
         }
     }
 
-    // Notificar overlay para buscar config atualizada (cor, fonte, etc.)
     notify_overlay(&app);
 
     Ok(true)
@@ -135,9 +145,32 @@ pub fn toggle_startup(state: State<'_, ConfigState>, enabled: bool) -> Result<bo
         Ok(true)
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
     {
-        Err("Startup toggle only supported on Windows".to_string())
+        let autostart_dir = dirs::config_dir()
+            .unwrap_or_default()
+            .join("autostart");
+        let desktop_file = autostart_dir.join("an8nymous-stats.desktop");
+
+        if enabled {
+            let _ = std::fs::create_dir_all(&autostart_dir);
+            let exe_path = std::env::current_exe()
+                .map_err(|e| e.to_string())?
+                .to_string_lossy()
+                .to_string();
+            let content = format!(
+                "[Desktop Entry]\nType=Application\nName=an8nymous Stats\nExec={}\nX-GNOME-Autostart-enabled=true\n",
+                exe_path
+            );
+            std::fs::write(&desktop_file, content).map_err(|e| e.to_string())?;
+        } else {
+            let _ = std::fs::remove_file(&desktop_file);
+        }
+
+        let mut cfg = state.0.lock().unwrap();
+        cfg.preferences.start_with_windows = enabled;
+        config::save_config(&cfg)?;
+        Ok(true)
     }
 }
 
@@ -159,9 +192,12 @@ pub fn get_startup_status() -> bool {
         }
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
     {
-        false
+        let desktop_file = dirs::config_dir()
+            .unwrap_or_default()
+            .join("autostart/an8nymous-stats.desktop");
+        desktop_file.exists()
     }
 }
 
@@ -171,7 +207,12 @@ pub fn reset_settings(app: AppHandle, state: State<'_, ConfigState>) -> Result<A
     *cfg = AppConfig::default();
     config::save_config(&cfg)?;
 
-    // Resetar posição do overlay
+    // Linux: regenerate conky config and restart
+    #[cfg(target_os = "linux")]
+    conky::apply(&cfg);
+
+    // Windows: reset overlay position
+    #[cfg(target_os = "windows")]
     if let Some(overlay) = app.get_webview_window("overlay") {
         let x = cfg.appearance.position_x.unwrap_or_else(|| {
             let screen_w = overlay
@@ -199,8 +240,27 @@ pub fn get_screen_size() -> (u32, u32) {
         (width, height)
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
     {
+        use std::process::Command;
+        // Parse xrandr output for primary monitor resolution
+        if let Ok(output) = Command::new("xrandr").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if line.contains(" connected primary") {
+                    // e.g. "HDMI-0 connected primary 3440x1440+0+0"
+                    if let Some(res) = line.split_whitespace().find(|s| s.contains('x') && s.contains('+')) {
+                        let res_part = res.split('+').next().unwrap_or("1920x1080");
+                        let parts: Vec<&str> = res_part.split('x').collect();
+                        if parts.len() == 2 {
+                            let w = parts[0].parse().unwrap_or(1920);
+                            let h = parts[1].parse().unwrap_or(1080);
+                            return (w, h);
+                        }
+                    }
+                }
+            }
+        }
         (1920, 1080)
     }
 }
@@ -229,6 +289,18 @@ pub fn open_settings(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub fn toggle_overlay(app: AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        if conky::is_running() {
+            conky::stop();
+        } else {
+            let state = app.state::<ConfigState>();
+            let cfg = state.0.lock().unwrap();
+            conky::start(&cfg);
+        }
+    }
+
+    #[cfg(target_os = "windows")]
     if let Some(window) = app.get_webview_window("overlay") {
         if window.is_visible().unwrap_or(false) {
             window.hide().map_err(|e| e.to_string())?;
@@ -236,5 +308,6 @@ pub fn toggle_overlay(app: AppHandle) -> Result<(), String> {
             window.show().map_err(|e| e.to_string())?;
         }
     }
+
     Ok(())
 }

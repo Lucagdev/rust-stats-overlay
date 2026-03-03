@@ -127,6 +127,8 @@ pub struct StatsCollector {
     networks: Networks,
     #[cfg(target_os = "windows")]
     disk_pdh: Option<disk_pdh::PdhDisk>,
+    #[cfg(target_os = "linux")]
+    prev_disk: Option<(u64, u64, std::time::Instant)>,
     gpu: Option<crate::gpu::GpuMonitor>,
 }
 
@@ -141,6 +143,8 @@ impl StatsCollector {
             networks,
             #[cfg(target_os = "windows")]
             disk_pdh: disk_pdh::PdhDisk::new(),
+            #[cfg(target_os = "linux")]
+            prev_disk: None,
             gpu: crate::gpu::GpuMonitor::new().ok(),
         }
     }
@@ -181,8 +185,8 @@ impl StatsCollector {
             .map(|d| d.collect())
             .unwrap_or((0.0, 0.0));
 
-        #[cfg(not(target_os = "windows"))]
-        let (disk_read_mb, disk_write_mb) = (0.0, 0.0);
+        #[cfg(target_os = "linux")]
+        let (disk_read_mb, disk_write_mb) = self.collect_disk_linux();
 
         // Network I/O — sysinfo returns delta since the last refresh()
         let mut net_rx: u64 = 0;
@@ -218,6 +222,55 @@ impl StatsCollector {
             net_down_mb,
             net_up_mb,
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn collect_disk_linux(&mut self) -> (f64, f64) {
+        let content = match std::fs::read_to_string("/proc/diskstats") {
+            Ok(c) => c,
+            Err(_) => return (0.0, 0.0),
+        };
+
+        let mut total_read_sectors: u64 = 0;
+        let mut total_write_sectors: u64 = 0;
+
+        for line in content.lines() {
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            if fields.len() < 14 {
+                continue;
+            }
+            let name = fields[2];
+            // Only count physical NVMe/sd devices, not partitions
+            if name.starts_with("nvme") && name.contains('p') {
+                continue;
+            }
+            if name.starts_with("nvme") || name.starts_with("sd") && name.len() == 3 {
+                total_read_sectors += fields[5].parse::<u64>().unwrap_or(0);
+                total_write_sectors += fields[9].parse::<u64>().unwrap_or(0);
+            }
+        }
+
+        let now = std::time::Instant::now();
+        let result = if let Some((prev_read, prev_write, prev_time)) = self.prev_disk {
+            let elapsed = now.duration_since(prev_time).as_secs_f64();
+            if elapsed > 0.0 {
+                // Sector size is 512 bytes
+                let read_mb = (total_read_sectors.saturating_sub(prev_read)) as f64 * 512.0
+                    / 1_048_576.0
+                    / elapsed;
+                let write_mb = (total_write_sectors.saturating_sub(prev_write)) as f64 * 512.0
+                    / 1_048_576.0
+                    / elapsed;
+                (read_mb, write_mb)
+            } else {
+                (0.0, 0.0)
+            }
+        } else {
+            (0.0, 0.0)
+        };
+
+        self.prev_disk = Some((total_read_sectors, total_write_sectors, now));
+        result
     }
 }
 

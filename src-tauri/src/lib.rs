@@ -1,5 +1,7 @@
 mod commands;
 mod config;
+#[cfg(target_os = "linux")]
+mod conky;
 mod gpu;
 mod stats;
 
@@ -13,6 +15,12 @@ use tauri::{
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Fix WebKitGTK DMA-BUF rendering artifacts on NVIDIA
+    #[cfg(target_os = "linux")]
+    unsafe {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+
     let cfg = config::load_config();
 
     tauri::Builder::default()
@@ -43,45 +51,58 @@ pub fn run() {
                         let _ = commands::toggle_overlay(app.clone());
                     }
                     "quit" => {
+                        #[cfg(target_os = "linux")]
+                        conky::stop();
                         app.exit(0);
                     }
                     _ => {}
                 });
             }
 
-            // Position overlay according to config
-            if let Some(overlay) = app.get_webview_window("overlay") {
+            // Linux: hide the Tauri overlay window and use Conky instead
+            #[cfg(target_os = "linux")]
+            {
+                if let Some(overlay) = app.get_webview_window("overlay") {
+                    let _ = overlay.hide();
+                }
                 let state = app.state::<ConfigState>();
                 let cfg = state.0.lock().unwrap();
-                let x = cfg.appearance.position_x.unwrap_or_else(|| {
-                    let screen_w = overlay
-                        .current_monitor()
-                        .ok()
-                        .flatten()
-                        .map(|m| m.size().width as i32)
-                        .unwrap_or(1920);
-                    screen_w - 700 - 15
-                });
-                let y = cfg.appearance.position_y;
-                let _ = overlay.set_position(tauri::PhysicalPosition::new(x, y));
-
-                // Make window click-through on Windows
-                #[cfg(target_os = "windows")]
-                make_click_through(&overlay);
+                conky::start(&cfg);
             }
 
-            // Re-assert always-on-top every 500ms to stay above game windows
-            let app_handle = app.handle().clone();
-            std::thread::spawn(move || {
-                loop {
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-                    if let Some(overlay) = app_handle.get_webview_window("overlay") {
-                        if overlay.is_visible().unwrap_or(false) {
-                            let _ = overlay.set_always_on_top(true);
+            // Windows: position overlay + click-through as before
+            #[cfg(target_os = "windows")]
+            {
+                if let Some(overlay) = app.get_webview_window("overlay") {
+                    let state = app.state::<ConfigState>();
+                    let cfg = state.0.lock().unwrap();
+                    let x = cfg.appearance.position_x.unwrap_or_else(|| {
+                        let screen_w = overlay
+                            .current_monitor()
+                            .ok()
+                            .flatten()
+                            .map(|m| m.size().width as i32)
+                            .unwrap_or(1920);
+                        screen_w - 700 - 15
+                    });
+                    let y = cfg.appearance.position_y;
+                    let _ = overlay.set_position(tauri::PhysicalPosition::new(x, y));
+                    make_click_through(&overlay);
+                }
+
+                // Re-assert always-on-top every 500ms to stay above game windows
+                let app_handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                        if let Some(overlay) = app_handle.get_webview_window("overlay") {
+                            if overlay.is_visible().unwrap_or(false) {
+                                let _ = overlay.set_always_on_top(true);
+                            }
                         }
                     }
-                }
-            });
+                });
+            }
 
             Ok(())
         })

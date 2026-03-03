@@ -177,7 +177,7 @@ footer { flex-shrink: 0; display: flex; justify-content: flex-end; gap: 10px; pa
                         <span class="slider-title">Horizontal position (X)</span>
                         <span class="slider-value" id="pos-x-val">0</span>
                     </div>
-                    <input type="range" id="pos-x" min="0" max="1920" value="0">
+                    <input type="range" id="pos-x" min="-500" max="5000" value="0">
                 </div>
             </div>
             <div class="setting-group">
@@ -186,7 +186,7 @@ footer { flex-shrink: 0; display: flex; justify-content: flex-end; gap: 10px; pa
                         <span class="slider-title">Vertical position (Y)</span>
                         <span class="slider-value" id="pos-y-val">15</span>
                     </div>
-                    <input type="range" id="pos-y" min="0" max="500" value="15">
+                    <input type="range" id="pos-y" min="-500" max="2000" value="15">
                 </div>
             </div>
             <div class="setting-group" id="opacity-group">
@@ -236,8 +236,8 @@ footer { flex-shrink: 0; display: flex; justify-content: flex-end; gap: 10px; pa
                         <span class="toggle-track"></span>
                     </label>
                     <div class="pref-text">
-                        <h3>Start with Windows</h3>
-                        <p>an8nymous Stats will launch automatically when you log in to Windows.</p>
+                        <h3>Start with system</h3>
+                        <p>an8nymous Stats will launch automatically when you log in.</p>
                     </div>
                 </div>
             </div>
@@ -391,7 +391,8 @@ function initAppearance() {
 
     const posX = document.getElementById('pos-x');
     const posXVal = document.getElementById('pos-x-val');
-    posX.max = screenWidth - 100;
+    posX.min = -500;
+    posX.max = screenWidth + 1000;
     const currentX = app.position_x != null ? app.position_x : (screenWidth - 665);
     posX.value = currentX;
     posXVal.textContent = currentX + 'px';

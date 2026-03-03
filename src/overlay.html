@@ -12,31 +12,24 @@ html, body {
     user-select: none;
     -webkit-user-select: none;
 }
-body {
-    display: flex;
-    align-items: center;
-    padding: 0 5px;
-    background: transparent !important;
-}
-#stats {
-    font-family: Arial, sans-serif;
-    font-size: 9pt;
-    color: #CCCCCC;
-    white-space: nowrap;
-    text-shadow: 0 0 3px rgba(0,0,0,0.8), 1px 1px 2px rgba(0,0,0,0.6);
-    letter-spacing: 0.3px;
-}
+canvas { display: block; }
 </style>
 </head>
 <body>
-<div id="stats">Loading...</div>
+<canvas id="overlay"></canvas>
 
 <script>
 const invoke = window.__TAURI__.core.invoke;
-const statsEl = document.getElementById('stats');
+const canvas = document.getElementById('overlay');
+const ctx = canvas.getContext('2d');
+
+// Match canvas to window size
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
 let config = null;
 let lastConfigStr = '';
+let lastStats = null;
 
 const FMT = {
     cpu:       (s) => `CPU ${s.cpu_percent.toFixed(0)}%`,
@@ -49,51 +42,58 @@ const FMT = {
     gpu_clock: (s) => s.gpu_clock_mhz != null ? `${s.gpu_clock_mhz}MHz` : null,
     vram:      (s) => s.vram_used_mb != null ? `VRAM ${s.vram_used_mb}MB` : null,
     disk_io:   (s) => `Disk ${Math.max(s.disk_read_mb, s.disk_write_mb).toFixed(0)}MB/s`,
-    net_io:    (s) => `↓${s.net_down_mb.toFixed(1)}↑${s.net_up_mb.toFixed(1)}MB/s`,
+    net_io:    (s) => `Net D:${s.net_down_mb.toFixed(1)} U:${s.net_up_mb.toFixed(1)}MB/s`,
 };
 
-function applyConfig(cfg) {
-    config = cfg;
-    statsEl.style.color = cfg.appearance.text_color || '#CCCCCC';
-    statsEl.style.fontFamily = cfg.appearance.font_family || 'Arial';
-    statsEl.style.fontSize = (cfg.appearance.font_size || 9) + 'pt';
-}
+function draw() {
+    if (!config || !lastStats) return;
 
-function renderStats(stats) {
-    if (!config) return;
     const order = config.metrics_order || Object.keys(FMT);
     const parts = [];
     for (const key of order) {
         if (!config.metrics[key]) continue;
         const fn = FMT[key];
         if (!fn) continue;
-        const v = fn(stats);
+        const v = fn(lastStats);
         if (v != null) parts.push(v);
     }
-    statsEl.textContent = parts.length > 0 ? parts.join('   ') : 'No metrics selected';
+    const text = parts.length > 0 ? parts.join('  |  ') : 'No metrics selected';
+
+    const fontSize = config.appearance.font_size || 9;
+    const fontFamily = config.appearance.font_family || 'Arial';
+    const color = config.appearance.text_color || '#CCCCCC';
+
+    // === Conky approach: clear everything, then redraw ===
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.font = `${fontSize}pt ${fontFamily}`;
+    ctx.fillStyle = color;
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = 3;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+    ctx.fillText(text, 5, canvas.height / 2 + fontSize / 2);
 }
 
-// Config polling: 100ms, compares JSON to detect changes (~0.01ms per call, Mutex read)
 async function pollConfig() {
     try {
         const cfg = await invoke('get_config');
         const str = JSON.stringify(cfg);
         if (str !== lastConfigStr) {
             lastConfigStr = str;
-            applyConfig(cfg);
+            config = cfg;
+            draw();
         }
     } catch (e) {}
 }
 
-// Stats polling: 1s interval
 async function pollStats() {
     try {
-        const stats = await invoke('get_stats');
-        renderStats(stats);
+        lastStats = await invoke('get_stats');
+        draw();
     } catch (e) {}
 }
 
-// Init
 (async () => {
     await pollConfig();
     await pollStats();
