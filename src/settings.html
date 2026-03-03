@@ -95,6 +95,13 @@ input[type="color"] { opacity: 0; width: 0; height: 0; position: absolute; }
 .slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .slider-title { font-size: 13px; color: var(--text-secondary); }
 .slider-value { font-size: 11.5px; font-family: 'Consolas', 'Courier New', monospace; color: var(--text-muted); min-width: 48px; text-align: right; }
+.pos-control { display: flex; align-items: center; gap: 0; }
+.pos-control .stepper-btn { width: 28px; height: 26px; font-size: 13px; }
+.pos-control .stepper-btn:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.pos-control .stepper-btn:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.pos-input { width: 64px; height: 26px; text-align: center; background: var(--bg-secondary); border: 1px solid var(--border); border-left: none; border-right: none; color: var(--text-secondary); font-size: 11.5px; font-family: 'Consolas', 'Courier New', monospace; outline: none; -moz-appearance: textfield; }
+.pos-input::-webkit-inner-spin-button, .pos-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.pos-input:focus { border-color: var(--accent-warm); }
 input[type="range"] { -webkit-appearance: none; width: 100%; height: 3px; background: var(--bg-tertiary); border-radius: 2px; outline: none; cursor: pointer; }
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: var(--accent-warm); border-radius: 50%; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
 input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); background: var(--accent); }
@@ -175,18 +182,26 @@ footer { flex-shrink: 0; display: flex; justify-content: flex-end; gap: 10px; pa
                 <div class="glass slider-group">
                     <div class="slider-header">
                         <span class="slider-title">Horizontal position (X)</span>
-                        <span class="slider-value" id="pos-x-val">0</span>
+                        <div class="pos-control">
+                            <button class="stepper-btn" id="pos-x-dec">&minus;</button>
+                            <input type="number" class="pos-input" id="pos-x-input" value="0">
+                            <button class="stepper-btn" id="pos-x-inc">+</button>
+                        </div>
                     </div>
-                    <input type="range" id="pos-x" min="-500" max="5000" value="0">
+                    <input type="range" id="pos-x" min="0" max="5000" value="0" step="1">
                 </div>
             </div>
             <div class="setting-group">
                 <div class="glass slider-group">
                     <div class="slider-header">
                         <span class="slider-title">Vertical position (Y)</span>
-                        <span class="slider-value" id="pos-y-val">15</span>
+                        <div class="pos-control">
+                            <button class="stepper-btn" id="pos-y-dec">&minus;</button>
+                            <input type="number" class="pos-input" id="pos-y-input" value="15">
+                            <button class="stepper-btn" id="pos-y-inc">+</button>
+                        </div>
                     </div>
-                    <input type="range" id="pos-y" min="-500" max="2000" value="15">
+                    <input type="range" id="pos-y" min="0" max="2000" value="15" step="1">
                 </div>
             </div>
             <div class="setting-group" id="opacity-group">
@@ -389,27 +404,8 @@ function initAppearance() {
         saveAppDebounced('text_color', e.target.value);
     });
 
-    const posX = document.getElementById('pos-x');
-    const posXVal = document.getElementById('pos-x-val');
-    posX.min = -500;
-    posX.max = screenWidth + 1000;
-    const currentX = app.position_x != null ? app.position_x : (screenWidth - 665);
-    posX.value = currentX;
-    posXVal.textContent = currentX + 'px';
-    posX.addEventListener('input', (e) => {
-        posXVal.textContent = e.target.value + 'px';
-        saveAppDebounced('position_x', parseInt(e.target.value));
-    });
-
-    const posY = document.getElementById('pos-y');
-    const posYVal = document.getElementById('pos-y-val');
-    const currentY = app.position_y != null ? app.position_y : 15;
-    posY.value = currentY;
-    posYVal.textContent = currentY + 'px';
-    posY.addEventListener('input', (e) => {
-        posYVal.textContent = e.target.value + 'px';
-        saveAppDebounced('position_y', parseInt(e.target.value));
-    });
+    initPositionControl('pos-x', 'position_x', app.position_x != null ? app.position_x : (screenWidth - 665), 0, screenWidth + 1000);
+    initPositionControl('pos-y', 'position_y', app.position_y != null ? app.position_y : 15, 0, screenHeight);
 
     const opacity = document.getElementById('opacity');
     const opacityVal = document.getElementById('opacity-val');
@@ -445,7 +441,54 @@ function initAppearance() {
 
 const saveAppDebounced = debounce((key, value) => {
     invoke('save_appearance', { key, value });
-}, 16);
+}, 400);
+
+function initPositionControl(id, configKey, initial, min, max) {
+    const slider = document.getElementById(id);
+    const input = document.getElementById(id + '-input');
+    const decBtn = document.getElementById(id + '-dec');
+    const incBtn = document.getElementById(id + '-inc');
+
+    slider.min = min;
+    slider.max = max;
+    slider.value = initial;
+    input.value = initial;
+
+    function setVal(v) {
+        const clamped = Math.max(min, Math.min(max, v));
+        slider.value = clamped;
+        input.value = clamped;
+        saveAppDebounced(configKey, clamped);
+    }
+
+    slider.addEventListener('input', () => {
+        input.value = slider.value;
+        saveAppDebounced(configKey, parseInt(slider.value));
+    });
+
+    input.addEventListener('change', () => setVal(parseInt(input.value) || 0));
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.target.blur(); }
+    });
+
+    decBtn.addEventListener('click', () => setVal(parseInt(input.value) - 1));
+    incBtn.addEventListener('click', () => setVal(parseInt(input.value) + 1));
+
+    // Hold-to-repeat on arrows
+    let holdTimer, holdInterval;
+    function startHold(delta) {
+        holdTimer = setTimeout(() => {
+            holdInterval = setInterval(() => setVal(parseInt(input.value) + delta), 50);
+        }, 400);
+    }
+    function stopHold() { clearTimeout(holdTimer); clearInterval(holdInterval); }
+    decBtn.addEventListener('mousedown', () => startHold(-1));
+    incBtn.addEventListener('mousedown', () => startHold(1));
+    decBtn.addEventListener('mouseup', stopHold);
+    incBtn.addEventListener('mouseup', stopHold);
+    decBtn.addEventListener('mouseleave', stopHold);
+    incBtn.addEventListener('mouseleave', stopHold);
+}
 
 function updateOpacityState(transparent) {
     document.getElementById('opacity-group').classList.toggle('disabled', transparent);

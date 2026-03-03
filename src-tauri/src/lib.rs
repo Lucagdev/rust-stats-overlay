@@ -13,6 +13,13 @@ use tauri::{
     Manager,
 };
 
+/// Headless mode: generate conky.conf from config.json and start conky (no UI, no WebKitGTK)
+#[cfg(target_os = "linux")]
+pub fn conky_only() {
+    let cfg = config::load_config();
+    conky::start(&cfg);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Fix WebKitGTK DMA-BUF rendering artifacts on NVIDIA
@@ -51,23 +58,19 @@ pub fn run() {
                         let _ = commands::toggle_overlay(app.clone());
                     }
                     "quit" => {
-                        #[cfg(target_os = "linux")]
-                        conky::stop();
                         app.exit(0);
                     }
                     _ => {}
                 });
             }
 
-            // Linux: hide the Tauri overlay window and use Conky instead
+            // Linux: destroy overlay window (Conky handles it), open settings UI
             #[cfg(target_os = "linux")]
             {
                 if let Some(overlay) = app.get_webview_window("overlay") {
-                    let _ = overlay.hide();
+                    let _ = overlay.destroy();
                 }
-                let state = app.state::<ConfigState>();
-                let cfg = state.0.lock().unwrap();
-                conky::start(&cfg);
+                let _ = commands::open_settings(app.handle().clone());
             }
 
             // Windows: position overlay + click-through as before
@@ -119,8 +122,9 @@ pub fn run() {
             commands::open_settings,
             commands::toggle_overlay,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, _event| {});
 }
 
 #[cfg(target_os = "windows")]
